@@ -9,15 +9,16 @@ class TankGame extends Phaser.Scene {
         this.TANK_SPEED = 120;
         this.BULLET_SPEED = 200;
         this.BULLET_SIZE = 4;
-        this.ENEMY_SPEED = 80;
+        this.ENEMY_SPEED = 60;
         this.ENEMY_SHOOT_RANGE = 150;
-        this.ENEMY_SHOOT_COOLDOWN = 1500;
+        this.ENEMY_SHOOT_COOLDOWN = 2500;
         
         // Game objects
         this.playerTank = null;
         this.cursors = null;
         this.spaceKey = null;
         this.playerBullet = null;
+        this.playerBullets = null;
         
         // Terrain groups
         this.brickWalls = null;
@@ -79,6 +80,7 @@ class TankGame extends Phaser.Scene {
         // Map boundaries
         this.mapWidth = this.GRID_SIZE * this.TILE_SIZE;
         this.mapHeight = this.GRID_SIZE * this.TILE_SIZE;
+        this.beforeMinusTimestamp = [];
     }
     
     preload() {
@@ -104,6 +106,9 @@ class TankGame extends Phaser.Scene {
         
         // Create player tank
         this.createPlayerTank();
+        this.playerBullets = this.physics.add.group({classType: Phaser.Physics.Arcade.Image,maxSize: 20,runChildUpdate: false});
+        this.createEnemySystem();
+        this.createPowerUpSystem();
         
         // Set up collisions
         this.setupCollisions();
@@ -111,11 +116,8 @@ class TankGame extends Phaser.Scene {
         // Create UI
         this.createUI();
         
-        // Create enemy system
-        this.createEnemySystem();
-        
         // Create power-up system
-        this.createPowerUpSystem();
+
         
         // Start game timer
         this.startGameTimer();
@@ -130,7 +132,7 @@ class TankGame extends Phaser.Scene {
     }
     
     update(time, delta) {
-        if (this.gameOver || this.gameWon || this.isRespawning) return;
+        if (this.gameOver || this.gameWon || this.isRespawning || !this.playerTank) return;
         
         this.handlePlayerInput(delta);
         this.updateBullets();
@@ -294,10 +296,9 @@ class TankGame extends Phaser.Scene {
     }
     
     createTankExplosion(x, y, isArmored = false) {
-        // Screen shake for explosions
-        const shakeIntensity = isArmored ? 8 : 5;
+        const shakeIntensity = isArmored ? 0.02 : 0.01; // use fractional for Phaser 3
         const shakeDuration = isArmored ? 300 : 200;
-        this.cameras.main.shake(shakeDuration, shakeIntensity);
+        this.cameras.main.shake(shakeDuration, shakeIntensity, false); // no flash
         
         // Create explosion sprite animation
         const explosion = this.add.sprite(x, y, 'explosion_frame_0');
@@ -353,8 +354,8 @@ class TankGame extends Phaser.Scene {
                 
                 // Create ricochet flash
                 const flash = this.add.graphics();
-                flash.fillStyle(0xffffff, 0.8);
-                flash.fillCircle(x, y, 8);
+                // flash.fillStyle(0xffffff, 0.8);
+                // flash.fillCircle(x, y, 8);
                 flash.setDepth(18);
                 
                 this.tweens.add({
@@ -396,7 +397,7 @@ class TankGame extends Phaser.Scene {
         
         [ripple1, ripple2, ripple3].forEach((ripple, index) => {
             ripple.lineStyle(2, 0x4169E1, 0.6);
-            ripple.strokeCircle(x, y, 5);
+            // ripple.strokeCircle(x, y, 5);
             ripple.setDepth(16);
             
             this.tweens.add({
@@ -449,10 +450,9 @@ class TankGame extends Phaser.Scene {
             repeat: 4
         });
         
-        // Sparkle burst
-        this.particleEmitters.sparkles.setPosition(tank.x, tank.y);
-        this.particleEmitters.sparkles.setTint(powerUp.powerUpType === 'star' ? 0xffd700 : 0x8B4513);
-        this.particleEmitters.sparkles.explode(15);
+        const sparklesEmitter = this.add.particles(0, 0, 'glow', {speed: { min: 20, max: 60 },scale: { start: 0.3, end: 0 },alpha: { start: 1, end: 0 },lifespan: 800,quantity: 12,tint: powerUp.powerUpType === 'star' ? 0xffd700 : 0x8B4513,emitting: false});
+        sparklesEmitter.setDepth(15);sparklesEmitter.setPosition(tank.x, tank.y);sparklesEmitter.explode(15);
+        this.time.delayedCall(1000, () => {sparklesEmitter.destroy();}, null, this);
     }
     
     createTrackMark(x, y, rotation) {
@@ -497,117 +497,61 @@ class TankGame extends Phaser.Scene {
     }
     
     createTankSprites() {
-        // Create player tank sprite (green rectangle)
         this.add.graphics()
-            .fillStyle(0x00ff00)
-            .fillRect(0, 0, this.TANK_SIZE, this.TANK_SIZE)
-            .generateTexture('playerTank', this.TANK_SIZE, this.TANK_SIZE);
+        .fillStyle(0x008000)
+        .fillRect(this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.6, this.TILE_SIZE * 0.6).fillStyle(0x006400).fillRect(this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.8).fillRect(this.TILE_SIZE * 0.8, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.8).fillStyle(0x4CAF50).fillRect(this.TILE_SIZE * 0.35, this.TILE_SIZE * 0.35, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.3).fillRect(this.TILE_SIZE * 0.45, this.TILE_SIZE * 0.05, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.3).fillRect(this.TILE_SIZE * 0.45, this.TILE_SIZE * 0.65, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.3).fillRect(this.TILE_SIZE * 0.05, this.TILE_SIZE * 0.45, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.1).fillRect(this.TILE_SIZE * 0.65, this.TILE_SIZE * 0.45, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.1).generateTexture('playerTank', this.TILE_SIZE, this.TILE_SIZE);
             
-        // Create tank direction indicator (small rectangle at front)
+    // Tank Direction
         this.add.graphics()
             .fillStyle(0x004400)
             .fillRect(this.TANK_SIZE - 4, this.TANK_SIZE / 2 - 2, 4, 4)
             .generateTexture('tankDirection', 4, 4);
             
-        // Create bullet sprite (yellow small rectangle)
+    // Create bullet sprite (yellow small rectangle)
         this.add.graphics()
             .fillStyle(0xffff00)
             .fillRect(0, 0, this.BULLET_SIZE, this.BULLET_SIZE)
             .generateTexture('bullet', this.BULLET_SIZE, this.BULLET_SIZE);
             
-        // Create Eagle Base sprite (red with eagle symbol)
-        this.add.graphics()
-            .fillStyle(0xff0000)
-            .fillRect(0, 0, this.TILE_SIZE, this.TILE_SIZE)
-            .fillStyle(0xffff00)
-            .fillCircle(this.TILE_SIZE/2, this.TILE_SIZE/2, 8)
-            .fillStyle(0xff0000)
-            .fillCircle(this.TILE_SIZE/2, this.TILE_SIZE/2, 4)
-            .generateTexture('eagleBase', this.TILE_SIZE, this.TILE_SIZE);
+    // Create Eagle Base sprite (red with eagle symbol)
+    this.add.graphics().fillStyle(0x606060).fillRect(0, 0, this.TILE_SIZE, this.TILE_SIZE).fillStyle(0xCD7F32).fillRect(this.TILE_SIZE * 0.35, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.5).fillRect(this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.4, this.TILE_SIZE * 0.25, this.TILE_SIZE * 0.3).fillRect(this.TILE_SIZE * 0.35, this.TILE_SIZE * 0.4, this.TILE_SIZE * 0.05, this.TILE_SIZE * 0.2).fillRect(this.TILE_SIZE * 0.25, this.TILE_SIZE * 0.5, this.TILE_SIZE * 0.05, this.TILE_SIZE * 0.2).fillRect(this.TILE_SIZE * 0.65, this.TILE_SIZE * 0.4, this.TILE_SIZE * 0.25, this.TILE_SIZE * 0.3).fillRect(this.TILE_SIZE * 0.6, this.TILE_SIZE * 0.4, this.TILE_SIZE * 0.05, this.TILE_SIZE * 0.2).fillRect(this.TILE_SIZE * 0.7, this.TILE_SIZE * 0.5, this.TILE_SIZE * 0.05, this.TILE_SIZE * 0.2).fillStyle(0xC0C0C0).fillRect(this.TILE_SIZE * 0.4, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.1).fillStyle(0x000000).fillRect(this.TILE_SIZE * 0.42, this.TILE_SIZE * 0.22, this.TILE_SIZE * 0.02, this.TILE_SIZE * 0.02).fillRect(this.TILE_SIZE * 0.56, this.TILE_SIZE * 0.22, this.TILE_SIZE * 0.02, this.TILE_SIZE * 0.02).fillStyle(0xFFFF00).fillRect(this.TILE_SIZE * 0.48, this.TILE_SIZE * 0.28, this.TILE_SIZE * 0.04, this.TILE_SIZE * 0.02).fillStyle(0x8B4513).fillRect(this.TILE_SIZE * 0.4, this.TILE_SIZE * 0.8, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.1).fillStyle(0xFFFFFF, 0.5).fillRect(this.TILE_SIZE * 0.4, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.15, this.TILE_SIZE * 0.02).generateTexture('eagleBase', this.TILE_SIZE, this.TILE_SIZE);
             
-        // Create Basic Enemy Tank (gray)
-        this.add.graphics()
-            .fillStyle(0x808080)
-            .fillRect(0, 0, this.TANK_SIZE, this.TANK_SIZE)
-            .fillStyle(0x404040)
-            .fillRect(this.TANK_SIZE - 4, this.TANK_SIZE / 2 - 2, 4, 4)
-            .generateTexture('basicEnemyTank', this.TANK_SIZE, this.TANK_SIZE);
+    // Create Basic Enemy Tank (gray)
+    this.add.graphics().fillStyle(0x808080).fillRect(this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.6, this.TILE_SIZE * 0.6).fillStyle(0x808080).fillRect(this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.8).fillRect(this.TILE_SIZE * 0.8, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.8).fillStyle(0xffffff).fillRect(this.TILE_SIZE * 0.35, this.TILE_SIZE * 0.35, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.3).fillRect(this.TILE_SIZE * 0.45, this.TILE_SIZE * 0.05, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.3).fillRect(this.TILE_SIZE * 0.45, this.TILE_SIZE * 0.65, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.3).fillRect(this.TILE_SIZE * 0.05, this.TILE_SIZE * 0.45, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.1).fillRect(this.TILE_SIZE * 0.65, this.TILE_SIZE * 0.45, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.1).generateTexture('basicEnemyTank', this.TILE_SIZE, this.TILE_SIZE);
             
-        // Create Armored Enemy Tank (dark red)
+    // Create Armored Enemy Tank (dark red)
         this.add.graphics()
             .fillStyle(0x8B0000)
-            .fillRect(0, 0, this.TANK_SIZE, this.TANK_SIZE)
-            .lineStyle(2, 0x654321)
-            .strokeRect(1, 1, this.TANK_SIZE - 2, this.TANK_SIZE - 2)
-            .fillStyle(0x400000)
-            .fillRect(this.TANK_SIZE - 4, this.TANK_SIZE / 2 - 2, 4, 4)
-            .generateTexture('armoredEnemyTank', this.TANK_SIZE, this.TANK_SIZE);
+    .fillRect(this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.6, this.TILE_SIZE * 0.6).fillStyle(0x8B0000).fillRect(this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.8).fillRect(this.TILE_SIZE * 0.8, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.8).fillStyle(0x400000).fillRect(this.TILE_SIZE * 0.35, this.TILE_SIZE * 0.35, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.3).fillRect(this.TILE_SIZE * 0.45, this.TILE_SIZE * 0.05, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.3).fillRect(this.TILE_SIZE * 0.45, this.TILE_SIZE * 0.65, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.3).fillRect(this.TILE_SIZE * 0.05, this.TILE_SIZE * 0.45, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.1).fillRect(this.TILE_SIZE * 0.65, this.TILE_SIZE * 0.45, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.1).generateTexture('armoredEnemyTank', this.TILE_SIZE, this.TILE_SIZE);
             
-        // Create Enemy Bullet (red)
+    // Enemy Bullet
         this.add.graphics()
-            .fillStyle(0xff0000)
+    .fillStyle(0x8B0000)
             .fillRect(0, 0, this.BULLET_SIZE, this.BULLET_SIZE)
-            .generateTexture('enemyBullet', this.BULLET_SIZE, this.BULLET_SIZE);
-            
-        // Create Star Power-up (yellow star)
+    .fillStyle(0xff0000).fillRect(1, 1, this.BULLET_SIZE - 2, this.BULLET_SIZE - 2).fillStyle(0xFF6347).fillRect(1, 1, this.BULLET_SIZE - 2, 1).generateTexture('enemyBullet', this.BULLET_SIZE, this.BULLET_SIZE);
+    // Brick Wall
         this.add.graphics()
-            .fillStyle(0xffff00)
-            .fillRect(0, 0, 16, 16)
-            .fillStyle(0xffd700)
-            .fillCircle(8, 8, 6)
-            .fillStyle(0xffff00)
-            .fillCircle(8, 4, 2)
-            .fillCircle(8, 12, 2)
-            .fillCircle(4, 8, 2)
-            .fillCircle(12, 8, 2)
-            .generateTexture('starPowerUp', 16, 16);
+    .fillStyle(0x444444).fillRect(0, 0, this.TILE_SIZE, this.TILE_SIZE).fillStyle(0x8B4513).fillRect(this.TILE_SIZE * 0.05, this.TILE_SIZE * 0.05, this.TILE_SIZE * 0.45, this.TILE_SIZE * 0.2).fillRect(this.TILE_SIZE * 0.525, this.TILE_SIZE * 0.05, this.TILE_SIZE * 0.45, this.TILE_SIZE * 0.2).fillRect(this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.45, this.TILE_SIZE * 0.2).fillRect(this.TILE_SIZE * 0.05, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.2).fillRect(this.TILE_SIZE * 0.775, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.2).fillRect(this.TILE_SIZE * 0.05, this.TILE_SIZE * 0.55, this.TILE_SIZE * 0.45, this.TILE_SIZE * 0.2).fillRect(this.TILE_SIZE * 0.525, this.TILE_SIZE * 0.55, this.TILE_SIZE * 0.45, this.TILE_SIZE * 0.2).fillRect(this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.8, this.TILE_SIZE * 0.45, this.TILE_SIZE * 0.2).fillRect(this.TILE_SIZE * 0.05, this.TILE_SIZE * 0.8, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.2).fillRect(this.TILE_SIZE * 0.775, this.TILE_SIZE * 0.8, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.2).generateTexture('brickWall', this.TILE_SIZE, this.TILE_SIZE);
+    // Steel Wall
+    this.add.graphics().fillStyle(0x708090).fillRect(0, 0, this.TILE_SIZE, this.TILE_SIZE).fillStyle(0x2F4F4F).fillRect(0, 0, this.TILE_SIZE, this.TILE_SIZE * 0.1).fillRect(0, this.TILE_SIZE * 0.9, this.TILE_SIZE, this.TILE_SIZE * 0.1).fillRect(0, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.8).fillRect(this.TILE_SIZE * 0.9, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.8).fillStyle(0xABB0B8).fillRect(this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.8, this.TILE_SIZE * 0.1).fillRect(this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.8).fillStyle(0xBBBCBE).fillRect(this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.1).fillRect(this.TILE_SIZE * 0.6, this.TILE_SIZE * 0.4, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.1).fillRect(this.TILE_SIZE * 0.4, this.TILE_SIZE * 0.7, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.1).generateTexture('steelWall', this.TILE_SIZE, this.TILE_SIZE);
             
-        // Create Shovel Power-up (brown shovel)
+       // Create Shovel Power-up (brown shovel)
         this.add.graphics()
-            .fillStyle(0x8B4513)
-            .fillRect(0, 0, 16, 16)
-            .fillStyle(0xA0522D)
-            .fillRect(6, 2, 4, 12)
-            .fillStyle(0x654321)
-            .fillRect(4, 2, 8, 4)
-            .generateTexture('shovelPowerUp', 16, 16);
-            
-        // Create terrain sprites
-        // Brick wall (brown)
+    .fillStyle(0x1E90FF).fillRect(0, 0, this.TILE_SIZE, this.TILE_SIZE).fillStyle(0x4169E1).fillRect(0, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.15, this.TILE_SIZE * 0.05).fillRect(this.TILE_SIZE * 0.15, this.TILE_SIZE * 0.325, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.05).fillRect(this.TILE_SIZE * 0.35, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.05).fillRect(this.TILE_SIZE * 0.55, this.TILE_SIZE * 0.325, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.05).fillRect(this.TILE_SIZE * 0.75, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.25, this.TILE_SIZE * 0.05).fillStyle(0xADD8E6).fillRect(0, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.15, this.TILE_SIZE * 0.025).fillRect(this.TILE_SIZE * 0.15, this.TILE_SIZE * 0.325, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.025).fillRect(this.TILE_SIZE * 0.35, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.025).fillRect(this.TILE_SIZE * 0.55, this.TILE_SIZE * 0.325, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.025).fillRect(this.TILE_SIZE * 0.75, this.TILE_SIZE * 0.3, this.TILE_SIZE * 0.25, this.TILE_SIZE * 0.025).fillStyle(0x4169E1).fillRect(0, this.TILE_SIZE * 0.6, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.05).fillRect(this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.625, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.05).fillRect(this.TILE_SIZE * 0.4, this.TILE_SIZE * 0.6, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.05).fillRect(this.TILE_SIZE * 0.6, this.TILE_SIZE * 0.625, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.05).fillRect(this.TILE_SIZE * 0.8, this.TILE_SIZE * 0.6, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.05).fillStyle(0xADD8E6).fillRect(0, this.TILE_SIZE * 0.6, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.025).fillRect(this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.625, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.025).fillRect(this.TILE_SIZE * 0.4, this.TILE_SIZE * 0.6, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.025).fillRect(this.TILE_SIZE * 0.6, this.TILE_SIZE * 0.625, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.025).fillRect(this.TILE_SIZE * 0.8, this.TILE_SIZE * 0.6, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.025)
+    .fillStyle(0x4169E1).fillRect(0, this.TILE_SIZE * 0.8, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.05).fillRect(this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.825, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.05).fillRect(this.TILE_SIZE * 0.4, this.TILE_SIZE * 0.8, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.05).fillRect(this.TILE_SIZE * 0.6, this.TILE_SIZE * 0.825, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.05).fillRect(this.TILE_SIZE * 0.8, this.TILE_SIZE * 0.8, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.05)
+        .fillStyle(0xADD8E6).fillRect(0, this.TILE_SIZE * 0.8, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.025).fillRect(this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.825, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.025).fillRect(this.TILE_SIZE * 0.4, this.TILE_SIZE * 0.8, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.025).fillRect(this.TILE_SIZE * 0.6, this.TILE_SIZE * 0.825, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.025).fillRect(this.TILE_SIZE * 0.8, this.TILE_SIZE * 0.8, this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.025)
+        .generateTexture('river', this.TILE_SIZE, this.TILE_SIZE);
+
         this.add.graphics()
-            .fillStyle(0x8B4513)
-            .fillRect(0, 0, this.TILE_SIZE, this.TILE_SIZE)
-            .lineStyle(2, 0x654321)
-            .strokeRect(1, 1, this.TILE_SIZE - 2, this.TILE_SIZE - 2)
-            .generateTexture('brickWall', this.TILE_SIZE, this.TILE_SIZE);
-            
-        // Steel wall (gray)
+    .fillStyle(0x1a331a, 1).fillRect(0, 0, this.TILE_SIZE, this.TILE_SIZE).fillStyle(0x228B22, 1).fillRect(this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.8, this.TILE_SIZE * 0.8).fillCircle(this.TILE_SIZE * 0.15, this.TILE_SIZE * 0.15, this.TILE_SIZE * 0.25).fillCircle(this.TILE_SIZE * 0.85, this.TILE_SIZE * 0.15, this.TILE_SIZE * 0.25).fillCircle(this.TILE_SIZE * 0.15, this.TILE_SIZE * 0.85, this.TILE_SIZE * 0.25).fillCircle(this.TILE_SIZE * 0.85, this.TILE_SIZE * 0.85, this.TILE_SIZE * 0.25).fillStyle(0x2e8b57, 1).fillCircle(this.TILE_SIZE / 2.5, this.TILE_SIZE / 2.7, this.TILE_SIZE / 3).fillCircle(this.TILE_SIZE / 1.7, this.TILE_SIZE / 1.8, this.TILE_SIZE / 3).fillCircle(this.TILE_SIZE / 2, this.TILE_SIZE / 1.5, this.TILE_SIZE / 3.2).fillStyle(0x9ACD32, 0.8).fillRect(this.TILE_SIZE * 0.15, this.TILE_SIZE * 0.1, this.TILE_SIZE * 0.7, this.TILE_SIZE * 0.2).fillCircle(this.TILE_SIZE / 3, this.TILE_SIZE / 4, this.TILE_SIZE / 6).fillCircle(this.TILE_SIZE / 1.5, this.TILE_SIZE / 4.5, this.TILE_SIZE / 7).fillStyle(0x32CD32, 1).fillCircle(this.TILE_SIZE / 2.2, this.TILE_SIZE / 2.1, this.TILE_SIZE / 14).fillCircle(this.TILE_SIZE / 1.8, this.TILE_SIZE / 2.3, this.TILE_SIZE / 16).fillCircle(this.TILE_SIZE / 2.5, this.TILE_SIZE / 1.9, this.TILE_SIZE / 15).fillCircle(this.TILE_SIZE / 1.6, this.TILE_SIZE / 2.6, this.TILE_SIZE / 14).fillCircle(this.TILE_SIZE / 2, this.TILE_SIZE / 2, this.TILE_SIZE / 18).fillCircle(this.TILE_SIZE / 1.4, this.TILE_SIZE / 2.2, this.TILE_SIZE / 17).fillStyle(0x145214, 0.65).fillRect(this.TILE_SIZE * 0.2, this.TILE_SIZE * 0.75, this.TILE_SIZE * 0.6, this.TILE_SIZE * 0.2).fillCircle(this.TILE_SIZE / 3, this.TILE_SIZE * 0.8, this.TILE_SIZE / 5).fillCircle(this.TILE_SIZE / 1.5, this.TILE_SIZE * 0.85, this.TILE_SIZE / 5).generateTexture('bush', this.TILE_SIZE, this.TILE_SIZE);
+
         this.add.graphics()
-            .fillStyle(0x708090)
-            .fillRect(0, 0, this.TILE_SIZE, this.TILE_SIZE)
-            .lineStyle(2, 0x2F4F4F)
-            .strokeRect(1, 1, this.TILE_SIZE - 2, this.TILE_SIZE - 2)
-            .generateTexture('steelWall', this.TILE_SIZE, this.TILE_SIZE);
-            
-        // River (blue)
+    .fillStyle(0x000000).fillRect(0, 0, 16, 16).fillStyle(0xFFC400).fillRect(4, 4, 8, 8).fillRect(2, 6, 12, 4).fillRect(6, 2, 4, 12).fillStyle(0xFFFF00).fillRect(4, 2, 8, 12).fillRect(2, 4, 12, 8).fillStyle(0xFFFDD0).fillRect(8, 0, 2, 4).fillRect(8, 12, 2, 4).fillRect(0, 8, 4, 2).fillRect(12, 8, 4, 2).generateTexture('starPowerUp', 16, 16);
+
         this.add.graphics()
-            .fillStyle(0x4169E1)
-            .fillRect(0, 0, this.TILE_SIZE, this.TILE_SIZE)
-            .fillStyle(0x1E90FF)
-            .fillRect(4, 4, this.TILE_SIZE - 8, this.TILE_SIZE - 8)
-            .generateTexture('river', this.TILE_SIZE, this.TILE_SIZE);
-            
-        // Bush (dark green)
-        this.add.graphics()
-            .fillStyle(0x228B22)
-            .fillRect(0, 0, this.TILE_SIZE, this.TILE_SIZE)
-            .fillStyle(0x32CD32)
-            .fillCircle(this.TILE_SIZE/4, this.TILE_SIZE/4, 6)
-            .fillCircle(3*this.TILE_SIZE/4, this.TILE_SIZE/4, 6)
-            .fillCircle(this.TILE_SIZE/4, 3*this.TILE_SIZE/4, 6)
-            .fillCircle(3*this.TILE_SIZE/4, 3*this.TILE_SIZE/4, 6)
-            .fillCircle(this.TILE_SIZE/2, this.TILE_SIZE/2, 8)
-            .generateTexture('bush', this.TILE_SIZE, this.TILE_SIZE);
+    .fillStyle(0x000000).fillRect(0, 0, 16, 16).fillStyle(0xC0C0C0).fillRect(4, 2, 8, 6).fillStyle(0x708090).fillRect(4, 2, 8, 2).fillRect(4, 6, 8, 2).fillRect(4, 2, 2, 6).fillRect(10, 2, 2, 6).fillStyle(0xA0522D).fillRect(7, 8, 2, 6).fillStyle(0x654321).fillRect(6, 13, 4, 2).generateTexture('shovelPowerUp', 16, 16);
+
+  
     }
     
     createGrid() {
@@ -631,7 +575,7 @@ class TankGame extends Phaser.Scene {
         
         // Create background
         const bg = this.add.graphics();
-        bg.fillStyle(0x8B4513); // Brown dirt color
+        bg.fillStyle(0x000000); // Brown dirt color
         bg.fillRect(0, 0, this.mapWidth, this.mapHeight);
         bg.setDepth(-2);
         
@@ -651,10 +595,13 @@ class TankGame extends Phaser.Scene {
         this.playerTank.setOrigin(0.5, 0.5);
         
         // Add direction indicator as a child
+
         this.tankDirection = this.add.sprite(0, 0, 'tankDirection');
         this.tankDirection.setOrigin(0, 0.5);
-        this.playerTank.addChild(this.tankDirection);
-        this.tankDirection.setPosition(this.TANK_SIZE/2 - 2, 0);
+
+        // Position it relative to the tank
+        this.tankDirectionOffsetX = this.TANK_SIZE / 2 - 2;
+        this.tankDirectionOffsetY = 0;
         
         // Set initial properties
         this.playerTank.currentDirection = 0; // 0=right, 90=down, 180=left, 270=up
@@ -665,7 +612,7 @@ class TankGame extends Phaser.Scene {
     }
     
     handlePlayerInput(delta) {
-        if (!this.playerTank) return;
+        if (!this.playerTank || !this.playerTank.body) return;
         
         const speed = this.TANK_SPEED * (delta / 1000);
         let moving = false;
@@ -787,48 +734,38 @@ class TankGame extends Phaser.Scene {
     }
     
     shootBullet() {
-        // Only shoot if no bullet is currently active
         if (this.playerBullet && this.playerBullet.active) {
             return;
         }
         
-        // Calculate bullet starting position (at tank's front)
         const tankX = this.playerTank.x;
         const tankY = this.playerTank.y;
         const tankRotation = this.playerTank.rotation;
         
-        // Calculate offset to spawn bullet at tank's front
         const offsetDistance = this.TANK_SIZE / 2 + 2;
         const bulletX = tankX + Math.cos(tankRotation) * offsetDistance;
         const bulletY = tankY + Math.sin(tankRotation) * offsetDistance;
         
-        // Create or reuse bullet
-        if (!this.playerBullet) {
-            this.playerBullet = this.physics.add.sprite(bulletX, bulletY, 'bullet');
-            this.playerBullet.setSize(this.BULLET_SIZE, this.BULLET_SIZE);
-            this.playerBullet.setCollideWorldBounds(true);
-            
-            // Destroy bullet when it hits world bounds
-            this.playerBullet.body.onWorldBounds = true;
-            this.physics.world.on('worldbounds', (event, body) => {
-                if (body.gameObject === this.playerBullet) {
-                    this.destroyBullet();
+        const bullet = this.playerBullets.get(bulletX, bulletY, 'bullet');
+
+        if (bullet) {
+            bullet.setActive(true);
+            bullet.setVisible(true);
+            bullet.setSize(this.BULLET_SIZE, this.BULLET_SIZE);
+            bullet.setCollideWorldBounds(true);
+            bullet.body.onWorldBounds = true;
+            this.physics.world.on('worldbounds', (body) => {
+                if (body.gameObject === bullet) {
+                    bullet.destroy();
                 }
             });
-        } else {
-            // Reposition existing bullet
-            this.playerBullet.setPosition(bulletX, bulletY);
-            this.playerBullet.setActive(true);
-            this.playerBullet.setVisible(true);
-        }
         
-        // Set bullet velocity based on tank direction
         const velocityX = Math.cos(tankRotation) * this.BULLET_SPEED;
         const velocityY = Math.sin(tankRotation) * this.BULLET_SPEED;
         
-        this.playerBullet.setVelocity(velocityX, velocityY);
-        this.playerBullet.setRotation(tankRotation);
-        this.playerBullet.setDepth(8);
+            bullet.setVelocity(velocityX, velocityY);
+            bullet.setRotation(tankRotation);
+        }
     }
     
     createTerrain() {
@@ -848,18 +785,18 @@ class TankGame extends Phaser.Scene {
         // Note: Eagle Base area (bottom-center) will be handled separately
         const mapData = [
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,1,1,0,2,2,2,0,3,3,0,1,1,4,0],
-            [0,1,1,0,2,2,2,0,3,3,0,1,1,4,0],
-            [0,0,0,0,0,0,0,0,3,3,0,0,0,0,0],
-            [4,4,1,1,0,0,4,4,3,3,4,4,0,2,2],
+            [0,1,1,0,2,2,2,0,0,0,0,1,1,4,0],
+            [0,1,1,0,2,2,2,0,0,0,0,1,1,4,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [4,4,1,1,0,0,4,4,0,0,4,4,0,2,2],
             [4,4,1,1,0,0,4,4,0,0,4,4,0,2,2],
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             [1,1,0,3,3,3,3,0,2,2,2,2,0,1,1],
-            [1,1,0,3,3,3,3,0,2,2,2,2,0,1,1],
+            [1,1,0,0,0,0,0,0,2,2,2,2,0,1,1],
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [2,2,4,4,0,1,1,1,1,0,4,4,3,3,0],
-            [2,2,4,4,0,1,1,1,1,0,4,4,3,3,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], // Eagle Base protection area - keep clear
+            [2,2,4,0,0,0,0,0,0,0,0,4,3,3,0],
+            [2,2,4,0,0,0,0,0,0,0,0,4,3,3,0],
+            [0,0,0,0,0,1,1,1,1,0,0,0,0,0,0], // Eagle Base protection area - keep clear
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], // Eagle Base protection area - keep clear
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]  // Eagle Base protection area - keep clear
         ];
@@ -927,13 +864,13 @@ class TankGame extends Phaser.Scene {
         this.physics.add.collider(this.enemyTanks, this.enemyTanks);
         
         // Player bullet collisions
-        this.physics.add.overlap(this.playerBullet, this.brickWalls, this.bulletHitBrick, null, this);
-        this.physics.add.overlap(this.playerBullet, this.steelWalls, this.bulletHitSteel, null, this);
-        this.physics.add.overlap(this.playerBullet, this.rivers, this.bulletHitRiver, null, this);
-        this.physics.add.overlap(this.playerBullet, this.eagleBase, this.bulletHitEagle, null, this);
-        this.physics.add.overlap(this.playerBullet, this.enemyTanks, this.playerBulletHitEnemy, null, this);
+        this.physics.add.overlap(this.playerBullets, this.brickWalls, this.bulletHitBrick, null, this);
+        this.physics.add.overlap(this.playerBullets, this.steelWalls, this.bulletHitSteel, null, this);
+        this.physics.add.overlap(this.playerBullets, this.rivers, this.bulletHitRiver, null, this);
+        this.physics.add.overlap(this.playerBullets, this.eagleBase, this.bulletHitEagle, null, this);
+        this.physics.add.overlap(this.playerBullets, this.enemyTanks, this.playerBulletHitEnemy, null, this);
         
-        // Enemy bullet collisions
+        // // Enemy bullet collisions
         this.physics.add.overlap(this.enemyBullets, this.brickWalls, this.enemyBulletHitBrick, null, this);
         this.physics.add.overlap(this.enemyBullets, this.steelWalls, this.enemyBulletHitSteel, null, this);
         this.physics.add.overlap(this.enemyBullets, this.rivers, this.enemyBulletHitRiver, null, this);
@@ -945,6 +882,7 @@ class TankGame extends Phaser.Scene {
     }
     
     bulletHitEagle(bullet, eagle) {
+        if (bullet.hitOnce) return; bullet.hitOnce = true;
         if (this.gameOver || this.gameWon) return;
         
         this.destroyBullet();
@@ -961,6 +899,7 @@ class TankGame extends Phaser.Scene {
     }
     
     bulletHitBrick(bullet, brick) {
+        if (bullet.hitOnce) return; bullet.hitOnce = true;
         // Brick walls are destroyed by bullets with enough power
         this.destroyBullet();
         
@@ -974,8 +913,9 @@ class TankGame extends Phaser.Scene {
     }
     
     bulletHitSteel(bullet, steel) {
+        if (bullet.hitOnce) return; bullet.hitOnce = true; steel.armor--;
         // Steel walls require high power bullets (power 3) to be damaged
-        if (this.playerBulletPower >= 3) {
+        if (this.playerBulletPower >= 3 || steel.armor <= 0) {
             // Destroy steel wall with power 3 bullets
             this.destroyBullet();
             this.createBulletImpactEffect(steel.x, steel.y, 'brick');
@@ -1065,9 +1005,7 @@ class TankGame extends Phaser.Scene {
     
     takeDamage(amount = 1) {
         if (this.gameOver || this.gameWon || this.isRespawning) return;
-        
-        this.playerHP -= amount;
-        
+        if (this.beforeMinusTimestamp.length === 0) { this.playerHP -= amount; this.beforeMinusTimestamp.push(Date.now()); } else { const beforeFrame = this.beforeMinusTimestamp.slice(-1)[0]; const now = Date.now(); if (now - beforeFrame > 500) { this.beforeMinusTimestamp.shift(); this.playerHP -= amount; this.beforeMinusTimestamp.push(now); } }
         // Create damage flash effect
         this.tweens.add({
             targets: this.playerTank,
@@ -1205,7 +1143,7 @@ class TankGame extends Phaser.Scene {
     createEnemySystem() {
         // Create enemy groups
         this.enemyTanks = this.physics.add.group();
-        this.enemyBullets = this.physics.add.group();
+        this.enemyBullets = this.physics.add.group({classType: Phaser.Physics.Arcade.Image,maxSize: 50, });
         
         // Define spawn points (top corners and top-center)
         this.spawnPoints = [
@@ -1213,10 +1151,9 @@ class TankGame extends Phaser.Scene {
             { x: this.mapWidth / 2, y: this.TILE_SIZE },                 // Top-center
             { x: this.mapWidth - this.TILE_SIZE, y: this.TILE_SIZE }     // Top-right
         ];
-        
         // Start spawning enemies
         this.spawnEnemyTimer = this.time.addEvent({
-            delay: 2000,
+            delay: 8000, // Reduced from 18000 for more frequent spawning
             callback: this.spawnEnemy,
             callbackScope: this,
             loop: true
@@ -1365,32 +1302,27 @@ class TankGame extends Phaser.Scene {
     enemyShoot(enemy, time) {
         enemy.lastShot = time;
         
-        // Calculate bullet starting position
+        // Make sure enemy bullet group exists (same as player bullets)
+        if (!this.enemyBullets) {this.enemyBullets = this.physics.add.group({classType: Phaser.Physics.Arcade.Image,maxSize: 20,runChildUpdate: false});}const tankX = enemy.x;const tankY = enemy.y;const tankRotation = enemy.rotation;
         const offsetDistance = this.TANK_SIZE / 2 + 2;
-        const bulletX = enemy.x + Math.cos(enemy.rotation) * offsetDistance;
-        const bulletY = enemy.y + Math.sin(enemy.rotation) * offsetDistance;
+        const bulletX = tankX + Math.cos(tankRotation) * offsetDistance;
+        const bulletY = tankY + Math.sin(tankRotation) * offsetDistance;
         
-        // Create bullet
-        const bullet = this.physics.add.sprite(bulletX, bulletY, 'enemyBullet');
+        const bullet = this.enemyBullets.get(bulletX, bulletY, 'enemyBullet'); // Using 'bullet' instead of 'enemyBullet'
+        if (bullet) {bullet.setActive(true);bullet.setVisible(true);
         bullet.setSize(this.BULLET_SIZE, this.BULLET_SIZE);
         bullet.setCollideWorldBounds(true);
+        bullet.body.onWorldBounds = true;
         bullet.power = enemy.bulletPower;
         bullet.setDepth(8);
         
-        // Set bullet velocity
-        const velocityX = Math.cos(enemy.rotation) * this.BULLET_SPEED;
-        const velocityY = Math.sin(enemy.rotation) * this.BULLET_SPEED;
-        bullet.setVelocity(velocityX, velocityY);
-        bullet.setRotation(enemy.rotation);
-        
-        this.enemyBullets.add(bullet);
-        
-        // Auto-destroy bullet after time
-        this.time.delayedCall(3000, () => {
-            if (bullet.active) {
+        this.physics.world.on('worldbounds', (body) => {
+                if (body.gameObject === bullet) {
                 bullet.destroy();
             }
         });
+        const velocityX = Math.cos(tankRotation) * this.BULLET_SPEED;const velocityY = Math.sin(tankRotation) * this.BULLET_SPEED;bullet.setVelocity(velocityX, velocityY);bullet.setRotation(tankRotation);
+        }
     }
     
     updateEnemyBullets() {
@@ -1404,25 +1336,21 @@ class TankGame extends Phaser.Scene {
     }
     
     playerBulletHitEnemy(bullet, enemy) {
-        this.destroyBullet();
+        if (bullet.hitOnce) return;
+        bullet.hitOnce = true;
+        this.destroyBullet(bullet);
         
         enemy.hp -= this.playerBulletPower;
-        
         // Create hit effect
         this.createBulletImpactEffect(enemy.x, enemy.y, 'steel');
         
         if (enemy.hp <= 0) {
             this.destroyEnemy(enemy);
+
         } else {
-            // Enemy damage flash
-            this.tweens.add({
-                targets: enemy,
-                tint: 0xff0000,
-                duration: 100,
-                yoyo: true,
-                onComplete: () => {
-                    enemy.setTint(0xffffff);
-                }
+            enemy.setTintFill(0xff0000);
+            this.time.delayedCall(100, () => {
+                if (enemy.active) enemy.clearTint();
             });
         }
     }
@@ -1454,6 +1382,9 @@ class TankGame extends Phaser.Scene {
     }
     
     enemyBulletHitSteel(bullet, steel) {
+        steel.armor--;
+        if (steel.armor === 0) {this.steelWalls.remove(steel);this.allSolids.remove(steel);steel.destroy();
+        }
         bullet.destroy();
         this.createBulletImpactEffect(steel.x, steel.y, 'steel');
     }
@@ -1474,13 +1405,9 @@ class TankGame extends Phaser.Scene {
         }
     }
     
-    enemyBulletHitPlayer(bullet, player) {
-        bullet.destroy();
-        
+    enemyBulletHitPlayer(bullet) {
+
         // Create hit effect
-        this.createBulletImpactEffect(player.x, player.y, 'steel');
-        
-        // Damage player
         this.takeDamage(bullet.power || 1);
     }
     
