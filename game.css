@@ -1,0 +1,104 @@
+body {
+  margin: 0;
+  padding: 20px;
+  font-family: 'Courier New', monospace;
+  background-color: #1a1a1a;
+  color: #ffffff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.game-container {
+  text-align: center;
+  background-color: #2a2a2a;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+}
+
+h1 {
+  color: #00ff00;
+  margin-bottom: 20px;
+  text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+}
+
+#game {
+  border-radius: 5px;
+  margin: 0 auto;
+  box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+  position: relative;
+}
+
+.game-ui {
+  top: 10px;
+  left: 10px;
+  color: #ffffff;
+  padding: 10px;
+  border-radius: 5px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  z-index: 1000;
+  min-width: 180px;
+}
+
+.ui-row {
+  margin: 3px 0;
+}
+
+.health-bar {
+  display: inline-block;
+  width: 60px;
+  height: 10px;
+  background: #333;
+  border: 1px solid #00ff00;
+  margin-left: 5px;
+  position: relative;
+}
+
+.health-fill {
+  height: 100%;
+  background: #00ff00;
+  transition: width 0.3s ease;
+}
+
+.game-over-screen {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: #ff0000;
+  padding: 30px;
+  border-radius: 10px;
+  text-align: center;
+  font-family: 'Courier New', monospace;
+  border: 3px solid #ff0000;
+  z-index: 2000;
+}
+
+.victory-screen {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: #00ff00;
+  padding: 30px;
+  border-radius: 10px;
+  text-align: center;
+  font-family: 'Courier New', monospace;
+  border: 3px solid #00ff00;
+  z-index: 2000;
+}
+
+.instructions {
+  margin-top: 20px;
+  color: #cccccc;
+  font-size: 14px;
+}
+
+.instructions p {
+  margin: 5px 0;
+}
