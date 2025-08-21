@@ -7,7 +7,7 @@ class TankGame extends Phaser.Scene {
         this.TILE_SIZE = 32;
         this.TANK_SIZE = 24;
         this.TANK_SPEED = 120;
-        this.BULLET_SPEED = 200;
+        this.BULLET_SPEED = 150;
         this.BULLET_SIZE = 4;
         this.ENEMY_SPEED = 60;
         this.ENEMY_SHOOT_RANGE = 150;
@@ -1382,8 +1382,8 @@ class TankGame extends Phaser.Scene {
     }
     
     enemyBulletHitSteel(bullet, steel) {
-        steel.armor--;
-        if (steel.armor === 0) {this.steelWalls.remove(steel);this.allSolids.remove(steel);steel.destroy();
+        steel.armor-=bullet.power;
+        if (steel.armor <= 0) {this.steelWalls.remove(steel);this.allSolids.remove(steel);steel.destroy();
         }
         bullet.destroy();
         this.createBulletImpactEffect(steel.x, steel.y, 'steel');
